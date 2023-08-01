@@ -23,22 +23,13 @@ class CodeSender_Main(QtWidgets.QMainWindow, MainWindow.Ui_MainWindow):
 
     def Set_Functions(self):
         self.Connection_lineEdit.textChanged.connect(self.Verify_IPv4)
-        self.Input_plainTextEdit.textChanged.connect(self.On_Input_Changed)
-        self.Input_plainTextEdit_2.textChanged.connect(self.On_Input_Changed)
-        self.Format_pushButton.clicked.connect(self.On_Format_Clicked)
-        self.Format_pushButton_2.clicked.connect(self.On_Format_Clicked)
+        self.Input_plainTextEdit.textChanged.connect(lambda: self.Verify_Code(self.Input_plainTextEdit.toPlainText(), self.Input_plainTextEdit))
+        self.Input_plainTextEdit_2.textChanged.connect(lambda: self.Verify_Code(self.Input_plainTextEdit_2.toPlainText(), self.Input_plainTextEdit_2))
+        self.Format_pushButton.clicked.connect(lambda: self.Format_Code(self.Input_plainTextEdit.toPlainText(), self.Input_plainTextEdit))
+        self.Format_pushButton_2.clicked.connect(lambda: self.Format_Code(self.Input_plainTextEdit_2.toPlainText(), self.Input_plainTextEdit_2))
         self.Connection_pushButton.clicked.connect(self.Connect)
-        self.Send_pushButton.clicked.connect(self.On_Send_Clicked)
-        self.Send_pushButton_2.clicked.connect(self.On_Send_Clicked)
-
-    def On_Input_Changed(self):
-        input_text = self.sender().toPlainText()
-        self.Verify_Code(input_text, self.sender())
-
-    def On_Format_Clicked(self):
-        input_text = self.sender().parent().findChild(QtWidgets.QPlainTextEdit).toPlainText()
-        formatted_text = self.Format_Code(input_text)
-        self.sender().parent().findChild(QtWidgets.QPlainTextEdit).setPlainText(formatted_text)
+        self.Send_pushButton.clicked.connect(lambda: self.Send(self.Input_plainTextEdit.toPlainText(), "RAM"))
+        self.Send_pushButton_2.clicked.connect(lambda: self.Send(self.Input_plainTextEdit_2.toPlainText(), "CAFE"))
 
     def Verify_IPv4(self):
         if Verification.IP_Verification(self.Connection_lineEdit.text()):
@@ -56,23 +47,32 @@ class CodeSender_Main(QtWidgets.QMainWindow, MainWindow.Ui_MainWindow):
             used_object.setStyleSheet("background-color: rgb(255, 0, 0);")
             used_object.verticalScrollBar().setStyleSheet("background-color: rgb(239, 239, 239);")
 
-    def Format_Code(self, code):
+    def Format_Code(self, code, used_object):
         input_string = code.replace(" ", "").replace("\n", "")
         output_string = ""
-        for i, c in enumerate(input_string):
-            if i % 17 == 16:
-                output_string += c + "\n"
+        i = 0
+        while i < len(input_string):
+            if input_string[i] == "#":
+                output_string += "#" + input_string[i+1:i+17]
+                i += 17
             else:
-                output_string += c
+                output_string += input_string[i:i+17]
+                i += 17
 
-        new_output_string = []
-        for i, line in enumerate(output_string.split("\n")):
-            if line.startswith("#"):
-                new_output_string.append("#" + line[1:9] + " " + line[9:])
-            elif line:
-                new_output_string.append(line[:8] + " " + line[8:])
+        new_output_string = ""
+        i = 0
+        while i < len(output_string):
+            if output_string[i] == "#":
+                new_output_string += "#" + output_string[i+1:i+9] + " " + output_string[i+9:i+17]
+                i += 17
+            else:
+                new_output_string += output_string[i:i+8] + " " + output_string[i+8:i+16]
+                i += 16
+            if i < len(output_string):
+                new_output_string += "\n"
 
-        return "\n".join(new_output_string).upper()
+        used_object.setPlainText(new_output_string.upper())
+        self.Verify_Code(used_object.toPlainText(), used_object)
 
     def Connect(self):
         if not self.connected:
@@ -92,20 +92,11 @@ class CodeSender_Main(QtWidgets.QMainWindow, MainWindow.Ui_MainWindow):
         self.Send_pushButton.setEnabled(False)
         self.Send_pushButton_2.setEnabled(False)
 
-    def On_Send_Clicked(self):
-        input_text = self.sender().parent().findChild(QtWidgets.QPlainTextEdit).toPlainText()
-        method = "RAM" if self.sender() == self.Send_pushButton else "CAFE"
-        if method not in ["RAM","CAFE"]:
-            print("Invalid Send() method. Program will now exit")
-            sys.exit(1)
-        self.Send(input_text, method)
-
     def Send(self, code_str, method):
         if method == "RAM":
-            commands = code_str.split("\n")
-            for command in commands:
-                if "#" not in command:
-                    addr, value = command.split()
+            for line in code_str.split("\n"):
+                if "#" not in line:
+                    addr, value = line.split()
                     self.tcp_con.kernelWrite(int(addr, 16), int(value, 16), True)
         elif method == "CAFE":
             cafe_code = ""
@@ -133,7 +124,6 @@ class CodeSender_Main(QtWidgets.QMainWindow, MainWindow.Ui_MainWindow):
         else:
             print("Invalid Send() method. Program will now exit")
             sys.exit(1)
-
 
 if __name__ == "__main__":
     import sys
